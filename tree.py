@@ -1,6 +1,6 @@
 import scipy.stats
 import numpy as np
-from node import *
+from node import Node
 from utils import *
 
 class Tree:
