@@ -3,6 +3,8 @@ A random forest trained to detect malicious network traffic from BRO Log files. 
 
 ## CTU Datasets TO-USE:
 ### Training
+Training datasets consist of botnet captures and logs only.
+
 - [CTU BOTNET - Capture 1](https://mcfp.felk.cvut.cz/publicDatasets/CTU-Malware-Capture-Botnet-1/)
 
     **Infected Machines:**
