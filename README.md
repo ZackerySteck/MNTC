@@ -4,6 +4,9 @@ A random forest trained to detect malicious network traffic from PCAP files. Bui
 ## CTU Datasets TO-USE:
 ### Training
 - [CTU BOTNET - Capture 1](https://mcfp.felk.cvut.cz/publicDatasets/CTU-Malware-Capture-Botnet-1/)
+Infected Machines:
+Windows Name: Win8, IP: 10.0.2.22 (Label: Botnet-V1)
+Windows Name: Win12, IP: 10.0.2.112 (Label: Botnet-V2)
 - [CTU BOTNET - Capture 2](https://mcfp.felk.cvut.cz/publicDatasets/CTU-Malware-Capture-Botnet-2/)
 - [CTU BOTNET - Capture 3](https://mcfp.felk.cvut.cz/publicDatasets/CTU-Malware-Capture-Botnet-3/)
 - [CTU BOTNET - Capture 4](https://mcfp.felk.cvut.cz/publicDatasets/CTU-Malware-Capture-Botnet-4/)

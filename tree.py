@@ -10,20 +10,17 @@ class Tree:
         self.root = Node(data.x, data.y)
         self.attributes = []
         self.numNodes = 1
-
         # calc yhat for root
         s = 0.0
         for l in data.y:
             s += l
         self.root.yhat = s/len(data.y)
         print("Root yhat: %0.4f" % (self.root.yhat))
-
         # Calc inital mses
         self.root.mse = self.calculateMSE(data.y, self.root.yhat)
         self.initial_train_mse = self.root.mse
         self.initial_test_mse = self.calculateMSE(self.validate.y, self.root.yhat)
         print("Root MSE: %0.4f" % (self.root.mse))
-
         # Set options
         self.debug = debug
         if self.debug:
@@ -34,7 +31,6 @@ class Tree:
         self.min_size = min_size
         self.max_depth = max_depth
         np.seterr(all='ignore')
-
         # Split the root to start
         self.split(self.root)
     
@@ -43,34 +39,10 @@ class Tree:
             node = self.root
         if node.size > self.min_size and depth < self.max_depth and node.mse > self.mse_threshold and node != self.root and np.sum(node.y == node.y[0]) != node.size:
             self.split(node)
-
         if node.hasChildren():
             self.build(node.children[0], depth+1)
             self.build(node.children[1], depth+1)
-
-        # if node is None:
-        #     node = self.root
-        # if node.size <= self.min_size or depth >= self.max_depth or (node.hasChildren() == False and node.getMSE() < self.mse_threshold):
-        #     return
-
-        # if node.hasChildren() == False:
-        #     print 'No children'
-        #     return
-
-        # left = node.children[0]
-        # right = node.children[1]
-
-        # # if left.size <= self.min_size or left.getMSE() < self.mse_threshold or np.sum(left.y == left.y[0]) == left.size:
-        # #     left.yhat = self.calc_yhat(left)
-        # if left.mse < self.mse_threshold or left.size > self.min_size:
-        #     self.split(left)
-        #     self.build(left, depth+1)
-
-        # # if right.size <= self.min_size or right.getMSE() < self.mse_threshold or np.sum(right.y == right.y[0]) == right.size:
-        # #     right.yhat = self.calc_yhat(right)
-        # if right.mse < self.mse_threshold or right.size > self.min_size:
-        #     self.split(right)
-        #     self.build(right, depth+1)
+        return self
 
     # def prune(self, node=None):
     #     if node is None:
@@ -106,11 +78,9 @@ class Tree:
     def predict(self, dataset=None):
         if dataset is None:
             dataset = self.data
-        
         x = dataset.x
         y = dataset.y
         yhat = []
-        
         for record in x:
             node = self.traverse(self.root, record)
             yhat.append(node.yhat)
@@ -123,7 +93,6 @@ class Tree:
 
     def traverse(self, node, record):
         # Traverse tree from node until prediction for record is found
-
         if node.hasChildren():
             if record[node.splitAttrib] < node.splitValue:
                 node = self.traverse(node.getChild(0), record)
@@ -147,7 +116,6 @@ class Tree:
         node.mse = self.calculateMSE(node.y, node.yhat)
         # Find the most closely correlated attribute and split
         bestAttrib, bestScore, splitValue, children = 999, None, None, None
-        
         for attrib in range(0, len(node.x[0, :])):
             value = np.median(node.x[:,attrib])
             potential_children = self.test_split(attrib, node.x, node.y, value) # Children = (left, right)
@@ -155,7 +123,6 @@ class Tree:
                 continue
             potential_children[0].yhat = self.calc_yhat(potential_children[0])
             potential_children[1].yhat = self.calc_yhat(potential_children[1])
-
             # To determine the best split, find the set S that maximizes
             # Delta_Error(s,t) = Err(t) - Err(s,t)
             # Where t = node to be split, s = potential child of t in S
@@ -168,15 +135,12 @@ class Tree:
                 bestAttrib, bestScore, splitValue, children = attrib, mse, value, potential_children
             if bestScore < self.mse_threshold:
                 break
-            # print("Splitting! Current best = x%i with split MSE = %0.4f" % (bestAttrib, bestScore))
         if children == None:
             return
         if bestAttrib not in self.attributes:
             self.attributes.append(bestAttrib)
-
         node.splitValue = splitValue
         node.splitAttrib = bestAttrib
-
         for child in children:
             node.addChild(child)
             self.numNodes += 1
@@ -202,7 +166,6 @@ class Tree:
             print "Error: Cannot display empty tree"
         elif node is None:
             node = self.root
-        
         print '\nDisplaying Tree:\n'
         print 'Root:'
         print '-----'
@@ -211,5 +174,4 @@ class Tree:
     def calc_yhat(self, node):
         outcomes = np.array(node.y, dtype='int64')
         counts = np.bincount(outcomes)
-
         return np.argmax(counts)
