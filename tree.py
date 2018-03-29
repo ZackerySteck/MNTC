@@ -15,12 +15,11 @@ class Tree:
         for l in data.y:
             s += l
         self.root.yhat = s/len(data.y)
-        print("Root yhat: %0.4f" % (self.root.yhat))
+
         # Calc inital mses
         self.root.mse = self.calculateMSE(data.y, self.root.yhat)
         self.initial_train_mse = self.root.mse
         self.initial_test_mse = self.calculateMSE(self.validate.y, self.root.yhat)
-        print("Root MSE: %0.4f" % (self.root.mse))
         # Set options
         self.debug = debug
         if self.debug:
@@ -31,6 +30,9 @@ class Tree:
         self.min_size = min_size
         self.max_depth = max_depth
         np.seterr(all='ignore')
+        if debug:
+            print("Root yhat: %0.4f" % (self.root.yhat))
+            print("Root MSE: %0.4f" % (self.root.mse))
         # Split the root to start
         self.split(self.root)
     
@@ -84,7 +86,7 @@ class Tree:
         for record in x:
             node = self.traverse(self.root, record)
             yhat.append(node.yhat)
-        mse = self.calculateMSE(y, yhat, predict=True)
+        mse = self.calculateMSE(y, yhat)
         misclassified = 0.0
         for i in range(0,len(yhat)):
             if yhat[i] != y[i]:
@@ -144,14 +146,14 @@ class Tree:
         for child in children:
             node.addChild(child)
             self.numNodes += 1
-        # if(self.debug):
-        #     (_,_,mse1) = self.predict(self.data)
-        #     (_,_,mse2) = self.predict(self.validate)
-        #     self.train_perf.append(mse1)
-        #     self.test_perf.append(mse2)
-        #     self.node_perf.append(self.numNodes)
+        if(self.debug):
+            (_,_,mse1) = self.predict(self.data)
+            (_,_,mse2) = self.predict(self.validate)
+            self.train_perf.append(mse1)
+            self.test_perf.append(mse2)
+            self.node_perf.append(self.numNodes)
 
-    def calculateMSE(self, y, yhat, predict=False):
+    def calculateMSE(self, y, yhat):
         sse = 0.0
         n = len(y)
         for error in (y-yhat):

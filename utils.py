@@ -19,7 +19,8 @@ class test:
         self.size = size
 
 def readData(filename, debug, label_index, variable_index, separator = ',', load_all=False):
-    print("\n\nReading data from %s" % (filename))
+    if debug:
+        print("\n\nReading data from %s" % (filename))
     df = pd.read_csv(filename, header=None, sep=separator)
     data = df.as_matrix()
     if(load_all):
@@ -27,12 +28,14 @@ def readData(filename, debug, label_index, variable_index, separator = ',', load
                             x_index = variable_index,
                             y_index = label_index,
                             size = len(data))
-    print("Data imported!")
-    print('-'*40)
+    if debug:
+        print("Data imported!")
+        print('-'*40)
     atom_size = test_size = len(data)/3.0
     training_size = int(math.ceil(atom_size*2))
     atom_size = test_size = int(math.floor(atom_size))
-    print("Data size: %d" % (len(data)))
+    if debug:
+        print("Data size: %d" % (len(data)))
     random.seed(datetime.now())
     training_set = None
     ix = []
@@ -54,10 +57,11 @@ def readData(filename, debug, label_index, variable_index, separator = ',', load
                     x_index = variable_index,
                     y_index = label_index,
                     size = test_size)
-    print("Data set size: %d x %d" % (data.shape[0],data.shape[1]))
-    print("Training set size: %d x %d" % (training_set.data.shape[0],training_set.data.shape[1]))
-    print("Test set size: %d x %d" % (test_set.data.shape[0],test_set.data.shape[1]))
-    print("_"*40)
+    if debug:
+        print("Data set size: %d x %d" % (data.shape[0],data.shape[1]))
+        print("Training set size: %d x %d" % (training_set.data.shape[0],training_set.data.shape[1]))
+        print("Test set size: %d x %d" % (test_set.data.shape[0],test_set.data.shape[1]))
+        print("_"*40)
     return (data, training_set, test_set)
 
 def getLabels(superset_attribs, superset_labels, subset_attribs):
