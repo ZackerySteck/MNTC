@@ -22,7 +22,7 @@ def main():
             print "'-t [VALUE]' : set mean square error threshold to value"
             return
 
-    # mntc = MNTC(['Data'])
+    mntc = MNTC(['Data'])
     # (data, training, test) = readData(
     #             filename = 'whitewine.csv',
     #             debug = False,
@@ -30,16 +30,16 @@ def main():
     #             variable_index = (0,10),
     #             separator= ';')
 
-    forest = Forest(filename = 'whitewine.csv',
-                    label_index = 11,
-                    variable_index = (0,10),
-                    separator=';',
-                    mse_threshold= 0.02,
-                    debug = debug,
-                    num_trees=10)
-    forest.build()
+    # forest = Forest(filename = 'whitewine.csv',
+    #                 label_index = 11,
+    #                 variable_index = (0,10),
+    #                 separator=';',
+    #                 mse_threshold= 0.02,
+    #                 debug = debug,
+    #                 num_trees=10)
+    # forest.build()
 
-    best = forest.predict(test)
+    # best = forest.predict(test)
     # print best
 
 

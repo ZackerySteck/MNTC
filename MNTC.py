@@ -16,19 +16,26 @@ class MNTC:
         print "Loading log files. This can take a few minutes depending on file size."
         if log_dir is None:
             return
-        raw_logs = {'conn':[],'ssl':[],'x509':[]}
+        raw_logs = {'conn':{},'ssl':{},'x509':{}}
         for log in self.log_paths:
             reader = bro_log_reader.BroLogReader(log)
             for row in reader.readrows():
                 if 'conn.log' in log:
-                    raw_logs['conn'].append(row)
+                    raw_logs['conn'][row['uid']] = row
                     break
                 if 'ssl.log' in log:
-                    raw_logs['ssl'].append(row)
+                    raw_logs['ssl'][row['uid']] = row
+                    break
                 else:
-                    raw_logs['x509'].append(row)
-        print raw_logs['conn'][0]
-        print raw_logs['ssl'][0]
+                    raw_logs['x509'][row['id']] = row
+                    # print row
+                    # raw_logs['x509'].append(row)
+                    break
+        # print raw_logs['conn']['Cp9zbb41PewMjy5tOe']
+        # print raw_logs['conn']['Cp9zbb41PewMjy5tOe']
+        # print raw_logs['ssl']
+        # raw_logs['ssl']['CyxxK9uoeEsgS6Dz4']['cert_chain_fuids'].split(',')[0]
+        self.interpretLogs(raw_logs)
     
     def constructPaths(self, log_dir = None):
         search = ['conn.log', 'ssl.log', 'x509.log']
@@ -48,3 +55,16 @@ class MNTC:
                     sub_dirs = [name for name in os.listdir(item)]
                     for obj in sub_dirs:
                         self.constructPaths(item+'/'+obj)
+    
+    def interpretLogs(self, logs):
+        conn = logs['conn']
+        ssl = logs['ssl']
+        x509 = logs['x509']
+
+        for id,record in ssl.items():
+            if id in conn:
+                target = conn[id]
+                (SrcIP, DstIp, DstPort,protocol) = target['id.orig_h'], target['id.resp_h'], target['id.resp_p'], target['service']
+                print SrcIP, DstIp, DstPort, protocol
+            else:
+                print("do something else")
