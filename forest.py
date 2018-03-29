@@ -41,22 +41,19 @@ class Forest:
         predictions = [] # List of tuples in form (yhat, misclassified, error)
         for tree in self.forest:
             predictions.append(tree.predict(dataset))
-        # print predictions
-        best = np.zeros(dataset.size)
+        best = np.zeros(dataset.size, dtype='float')
         for i in range(dataset.size):
-            votes = np.zeros(self.num_trees)
+            votes = np.zeros(self.num_trees, dtype='float')
             t = 0
             for yhat, _, _ in predictions:
-                votes[t] = yhat[t]
+                votes[t] = yhat[i]
                 t += 1
-            best[i] = self.getBest(votes)
+            best[i] = self.getBest(votes) # With WhiteWine, Voting appears to reduce error further than Mean
         return (best, self.calculateMSE(dataset.y, best))
 
     def getBest(self, votes):
-        print votes
         outcomes = np.array(votes, dtype='int64')
         counts = np.bincount(outcomes)
-
         return np.argmax(counts)
 
     def calculateMSE(self, y, yhat):

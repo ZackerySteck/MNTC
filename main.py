@@ -23,25 +23,26 @@ def main():
             return
 
     # mntc = MNTC(['Data'])
-    (data, training, test) = readData(
-                filename = 'whitewine.csv',
-                debug = False,
-                label_index = 11,
-                variable_index = (0,10),
-                separator= ';')
+    # (data, training, test) = readData(
+    #             filename = 'whitewine.csv',
+    #             debug = False,
+    #             label_index = 11,
+    #             variable_index = (0,10),
+    #             separator= ';')
 
     forest = Forest(filename = 'whitewine.csv',
                     label_index = 11,
                     variable_index = (0,10),
                     separator=';',
                     mse_threshold= 0.02,
-                    debug = debug)
+                    debug = debug,
+                    num_trees=10)
     forest.build()
 
-    # print test.y
-    # forest.forest[0].printTree()
     best = forest.predict(test)
-    print best
+    # print best
+
+
     # train0, = plt.plot(forest.forest[0].node_perf, forest.forest[0].train_perf,'k',label='Tree 1 - Training')
     # test0, = plt.plot(forest.forest[0].node_perf, forest.forest[0].test_perf, 'k--',label='Test 1 - Test')
     # train1, = plt.plot(forest.forest[1].node_perf, forest.forest[1].train_perf,'r',label='Tree 2 - Training')
