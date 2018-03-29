@@ -144,12 +144,12 @@ class Tree:
         for child in children:
             node.addChild(child)
             self.numNodes += 1
-        if(self.debug):
-            (_,_,mse1) = self.predict(self.data)
-            (_,_,mse2) = self.predict(self.validate)
-            self.train_perf.append(mse1)
-            self.test_perf.append(mse2)
-            self.node_perf.append(self.numNodes)
+        # if(self.debug):
+        #     (_,_,mse1) = self.predict(self.data)
+        #     (_,_,mse2) = self.predict(self.validate)
+        #     self.train_perf.append(mse1)
+        #     self.test_perf.append(mse2)
+        #     self.node_perf.append(self.numNodes)
 
     def calculateMSE(self, y, yhat, predict=False):
         sse = 0.0

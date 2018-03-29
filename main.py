@@ -1,7 +1,8 @@
 from utils import *
-from forest import Forest
+# from forest import Forest
 import matplotlib.pyplot as plt
 import sys
+from MNTC import MNTC
 
 def main():
     debug = False
@@ -18,5 +19,6 @@ def main():
             print "'-t [VALUE]' : set mean square error threshold to value"
             return
 
+    mntc = MNTC(['Data'])
 if __name__ == "__main__":
     main()
