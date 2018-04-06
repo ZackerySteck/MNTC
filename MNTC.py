@@ -4,10 +4,12 @@ from pprint import pprint
 import os
 
 class MNTC:
-    def __init__(self,log_dir = None, debug = False):
+    def __init__(self,log_dir = None, labels = None, debug = False):
         self.log_dir = log_dir
+        self.raw_logs = None
         self.log_paths = []
         self.debug = debug
+        self.labels = labels
         if log_dir is not None:
             self.constructPaths(log_dir)
             self.loadLogs(log_dir)
@@ -22,21 +24,16 @@ class MNTC:
             for row in reader.readrows():
                 if 'conn.log' in log:
                     raw_logs['conn'][row['uid']] = row
-                    break
-                if 'ssl.log' in log:
+                    # break
+                elif 'ssl.log' in log:
                     raw_logs['ssl'][row['uid']] = row
-                    break
                 else:
                     raw_logs['x509'][row['id']] = row
-                    # print row
-                    # raw_logs['x509'].append(row)
-                    break
-        # print raw_logs['conn']['Cp9zbb41PewMjy5tOe']
-        # print raw_logs['conn']['Cp9zbb41PewMjy5tOe']
-        # print raw_logs['ssl']
-        # raw_logs['ssl']['CyxxK9uoeEsgS6Dz4']['cert_chain_fuids'].split(',')[0]
+        # print raw_logs['ssl'].items()[0]
+        self.raw_logs = raw_logs
         self.interpretLogs(raw_logs)
-    
+
+    # Recursively construct directory strings from root until files are found
     def constructPaths(self, log_dir = None):
         search = ['conn.log', 'ssl.log', 'x509.log']
         if type(log_dir) is str:
@@ -56,15 +53,47 @@ class MNTC:
                     for obj in sub_dirs:
                         self.constructPaths(item+'/'+obj)
     
-    def interpretLogs(self, logs):
+    def interpretLogs(self, logs = None):
+        if logs is None:
+            return
         conn = logs['conn']
         ssl = logs['ssl']
         x509 = logs['x509']
 
-        for id,record in ssl.items():
+        # Items we want:
+        # 1. Connection 4-Tuple
+        # --- SSL Aggregation ---
+        # 1. SSL 4-tuple
+        # 2. SSL Record
+        # 3. Connection Record
+        # 4. x509 certs
+
+        data = []
+        for id,ssl_record in ssl.items():
             if id in conn:
-                target = conn[id]
-                (SrcIP, DstIp, DstPort,protocol) = target['id.orig_h'], target['id.resp_h'], target['id.resp_p'], target['service']
-                print SrcIP, DstIp, DstPort, protocol
-            else:
-                print("do something else")
+                ssl_tuple = ssl_record['id.orig_h'], ssl_record['id.resp_h'], ssl_record['id.resp_p'], ssl_record['version']
+                # Get connection record of SSL session
+                connection_record = conn[id]
+                # Build 4-tuple
+                conn_tuple = (SrcIP, DstIp, DstPort,protocol) = connection_record['id.orig_h'], connection_record['id.resp_h'], connection_record['id.resp_p'], connection_record['service']
+                # Label 4-tuple
+                conn_label = 'Normal'
+                if self.labels is not None and (SrcIP in self.labels or DstIp in self.labels):
+                    conn_label = 'Malicous'
+                # Get certs for SSL session
+                cert_key = ssl_record['cert_chain_fuids'].split(',')[0]
+                certs = None
+                if cert_key !=  '-':
+                    certs = x509[cert_key]
+                ssl_aggregation = [ssl_record, connection_record] if certs is None else [ssl_record, certs,connection_record]
+                data.append([conn_tuple, ssl_aggregation, conn_label])
+        print data
+        # for id,record in conn.items():
+        #     conn_tuple = (SrcIP, DstIp, DstPort,protocol) = connection_record['id.orig_h'], connection_record['id.resp_h'], connection_record['id.resp_p'], connection_record['service']
+        #     if conn_tuple in data[0,:] and data
+
+
+
+# Find the ssl sessions in the set of connections
+# Match these ssl sessions to their respective connection 4-tuple
+# For the ssl sessions, aggregate the connection record, SSL record, Certifications, and label

@@ -18,12 +18,12 @@ class test:
         self.y = np.array(data[:,y_index])
         self.size = size
 
-def readData(filename, debug, label_index, variable_index, separator = ',', load_all=False):
+def readData(filename, debug, label_index, variable_index, separator = ',', load_all = False):
     if debug:
         print("\n\nReading data from %s" % (filename))
     df = pd.read_csv(filename, header=None, sep=separator)
     data = df.as_matrix()
-    if(load_all):
+    if load_all :
         return training(data,
                             x_index = variable_index,
                             y_index = label_index,
