@@ -1,10 +1,9 @@
 # from forest import Forest
-import matplotlib.pyplot as plt
 import sys
-from MNTC import MNTC
-from forest import Forest
+# from MNTC import MNTC
+from test import TEST
+# from forest import Forest
 from utils import *
-import matplotlib.pyplot as plt
 
 
 def main():
@@ -28,7 +27,10 @@ def main():
                                 variable_index = (0,0),
                                 separator=',',load_all=True)
                                 
-    mntc = MNTC(['Data'], training.y)
+    # mntc = MNTC(['Data'], training.y)
+    test = TEST(['Data'], training.y)
+    test.preProcess()
+
     
 if __name__ == "__main__":
     main()

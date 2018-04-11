@@ -1,0 +1,30 @@
+﻿Let’s have the set N of the Connection 4-tuples, then
+For each capture in dataset:
+For each SSL record in ssl.log:
+Take an unique key from the SSL record and find the connection record in
+conn.log with this unique key. This found connection record contains a 4-tuple
+(SrcIP, DstIP, DstPort, protocol). If this connection record does not have Mal-
+ware or Normal label, read next SSL record.
+
+If the certificate path in the SSL record is not empty take the first certificate
+unique key from the certificate path and find the certificate record in x509.log
+with this certificate unique key.
+
+These 3 or 2 found records are new SSL aggregation containing the 4-tuple. Find
+some Connection 4-tuple in the set N containing the ­4-tuple from the SSL aggre-
+gation and add this SSL aggregation to this found Connection 4-tuple. If such
+Connection 4-tuple does not exist, create new Connection 4-tuple with key as
+4-tuple from the SSL aggregation, add the SSL aggregation to the newly created
+connection 4-tuple and add this newly created connection 4-tuple to the set N.
+
+For each connection record in conn.log:
+Take the 4-tuple from the connection record. If there is any Connection 4-tuple
+in the set N that has a key same as the 4-tuple from the connection record
+and the Connection 4-tuple does not contain this connection record in any SSL
+aggregation, add this connection record to the Connection 4-tuple.
+
+Compute features for each Connection 4-tuple in the set N and create the data model
+from the set N, where the rows are the Connection 4-tuples and the columns are
+feature values.
+
+
