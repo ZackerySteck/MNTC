@@ -62,13 +62,18 @@ class MalNetTraffClass:
             elif 'ssl.log' in log:
                 ssl = self.parseLog(log, [0,1,2,4,5,6,14], [7])
                 ssl.columns = ['ts', 'uid', 'id.orig_h','id.resp_h','id.resp_p','version','cert_chain_fuids']
-                # print ssl.loc[0,:]
                 current = ssl
-            # else:
-                # x509 = self.parseLog(log, [0,1,], [7])
-                # x509.columns = ['ts','id','certificate.not_valid_before','certificate.not_valid_after'
-                #                 'san.dns']
-            #     current = x509
+            else:
+                x509 = self.parseLog(log, range(20), [7])
+                x509.columns = ['ts','id','certificate.version',
+                               'certificate.serial','certificate.subject',
+                               'certificate.issuer','certificate.not_valid_before',
+                               'certificate.not_valid_after','certificate.key_alg',
+                               'certificate.sig_alg','certificate.key_type',
+                               'certificate.key_length','certificate.exponent',
+                               'certificate.curve','san.dns','san.uri','san.email','san.ip',
+                               'basic_constraints.ca','basic_constraints.path_len']
+                current = x509
             if current is not None:
                 elapsed = time.time() - start
                 print('File processing completed in %0.4f seconds' % (elapsed))
@@ -84,15 +89,19 @@ class MalNetTraffClass:
         self.constructFeatures(conn,ssl,x509)
     
     def constructFeatures(self,conn,ssl,x509):
-        for id,ssl_record in ssl.set_index('uid').iterrows():
-            conn_record = conn.loc[conn['uid'] == id]
+        conn.set_index('uid', inplace=True)
+        ssl.set_index('uid', inplace=True)
+        x509.set_index('id', inplace=True)
+
+        for id,ssl_record in ssl.iterrows():
+            conn_record = conn.loc[id]
+            print conn_record
             if conn_record is not None:
                 # Get connection record of SSL session (if it exists)
-                conn_tuple = conn_record['id.orig_h'], conn_record['id.resp_h'], conn_record['id.resp_p'],conn_record['service']
-                print conn_tuple
+                conn_tuple = (conn_record['id.orig_h'], conn_record['id.resp_h'], conn_record['id.resp_p'],conn_record['service'])
                 # Label 4-tuple
                 label = 'Normal'
-                if self.labels is not None and (conn_tuple['id.orig_h'] in self.labels or conn_tuple['id.resp_h'] in self.labels):
+                if self.labels is not None and (conn_tuple[0] in self.labels or conn_tuple[1] in self.labels):
                     label = 'Malicous'
                 # Get certs for SSL session (If they exist)
                 cert_key = ssl_record['cert_chain_fuids'].split(',')[0]
