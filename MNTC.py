@@ -1,19 +1,16 @@
-from bat import bro_log_reader, log_to_dataframe
 import pandas as pd
-import numpy as np
-from forest import Forest
-import os
-import datetime
+from utils import *
+import datetime, time, os
 
-class MNTC:
-    def __init__(self,log_dir = None, labels = None, debug = False):
+class MalNetTraffClass:
+    def __init__(self,log_dir = None, labels = None, debug = False, pickle = False):
         self.log_dir = log_dir
         self.log_paths = []
         self.debug = debug
         self.labels = labels
+        self.pickle = pickle
         if log_dir is not None:
             self.constructPaths(log_dir)
-            self.loadLogs(log_dir)
 
     # Recursively construct directory strings from root until files are found
     def constructPaths(self, log_dir = None):
@@ -35,67 +32,74 @@ class MNTC:
                     for obj in sub_dirs:
                         self.constructPaths(item+'/'+obj)
     
-    def loadLogs(self, log_dir = None):
-        print "Loading log files. This can take a few minutes depending on file size."
-        raw_logs = {'conn':{},'ssl':{},'x509':{}}
-        for log in self.log_paths:
-            reader = bro_log_reader.BroLogReader(log)
-            for row in reader.readrows():
-                if 'conn.log' in log:
-                    raw_logs['conn'][row['uid']] = ((row['id.orig_h'],
-                                                    row['id.resp_h'],
-                                                    row['id.resp_p'],
-                                                    row['service']),
-                                                    {'duration':row['duration'],
-                                                    'orig_bytes':row['orig_bytes'],
-                                                    'resp_bytes':row['resp_bytes'],
-                                                    'orig_pkts':row['orig_pkts'],
-                                                    'resp_pkts':row['resp_pkts'],
-                                                    'ts':row['ts'],
-                                                    'conn_state':row['conn_state']})
-                    # if len(raw_logs['conn']) == 1000000:
-                    #     break
-                elif 'ssl.log' in log:
-                    raw_logs['ssl'][row['uid']] = row
-                else:
-                    raw_logs['x509'][row['id']] = row
-        # print raw_logs['conn'].items()[0]
-        self.interpretLogs(raw_logs)
-    
+    def parseLog(self, log, cols, skiprows):
+        if self.pickle and os.path.isfile('./pickle/'+log.replace('/','%')+'.pkl'):
+                pickle = './pickle/'+log.replace('/','%')+'.pkl'
+                print 'Pickle found for %s! Loading.' % (bcolors.UNDERLINE+log+bcolors.ENDC)
+                return pd.read_pickle(pickle)
+        print('Processing %s' % (bcolors.UNDERLINE+log+bcolors.ENDC))
+        return pd.read_csv(log,delimiter='\t',
+                header=6,skiprows=skiprows,
+                index_col=None,usecols=cols,
+                low_memory=False)
 
-    # --- Connection 4-Tuple ---
-    # 1. 4-tuple (srcip, dstip, dstport, protocol) - Acts as UID for each Conn 4-tuple
-        # 2. SSL Aggregations
-        # 3. Connection Records
-        # .... OTHER FEATURES ....
-
-        # --- SSL Aggregation ---
-        # 1. SSL Record
-        # 2. Connection Record
-        # 3. x509 certs
-    def interpretLogs(self, logs = None):
-        if logs is None:
+    def preProcess(self, log_dir = None):
+        print bcolors.WARNING+"Loading log files. This can take a some time depending on file size."+bcolors.ENDC
+        print '-'*40
+        conn, ssl, x509 = None,None,None
+        if self.log_paths is None:
             return
-        conn = logs['conn']
-        ssl = logs['ssl']
-        x509 = logs['x509']
-        logs.clear()
-
-        data = {}
-        features = {}
-        print 'Interpreting Logs...'
-        for id,ssl_record in ssl.items():
-            if id in conn:
+        elif log_dir is None:
+            log_dir = self.log_paths
+        for log in log_dir:
+            current = None
+            start = time.time()
+            if 'conn.log' in log:
+                conn = self.parseLog(log, [0,1,2,4,5,7,8,9,10,16,18], [7])
+                conn.columns = ['ts', 'uid', 'id.orig_h','id.resp_h','id.resp_p','service',
+                                'duration','orig_bytes','resp_bytes','orig_pkts','resp_pkts']
+                current = conn
+            elif 'ssl.log' in log:
+                ssl = self.parseLog(log, [0,1,2,4,5,6,14], [7])
+                ssl.columns = ['ts', 'uid', 'id.orig_h','id.resp_h','id.resp_p','version','cert_chain_fuids']
+                # print ssl.loc[0,:]
+                current = ssl
+            # else:
+                # x509 = self.parseLog(log, [0,1,], [7])
+                # x509.columns = ['ts','id','certificate.not_valid_before','certificate.not_valid_after'
+                #                 'san.dns']
+            #     current = x509
+            if current is not None:
+                elapsed = time.time() - start
+                print('File processing completed in %0.4f seconds' % (elapsed))
+                print(bcolors.OKBLUE+'Dimensions after processing: %d x %d' % current.shape)
+                print bcolors.ENDC
+                if self.pickle and not os.path.isfile('./pickle/'+log.replace('/','%')+'.pkl'):
+                    start = time.time()
+                    print('Pickling dataset...')
+                    current.to_pickle('./pickle/'+log.replace('/','%')+'.pkl')
+                    elapsed = time.time() - start
+                    print('File pickled in %0.4f seconds' % (elapsed))
+                print '-'*40
+        self.constructFeatures(conn,ssl,x509)
+    
+    def constructFeatures(self,conn,ssl,x509):
+        for id,ssl_record in ssl.set_index('uid').iterrows():
+            conn_record = conn.loc[conn['uid'] == id]
+            if conn_record is not None:
                 # Get connection record of SSL session (if it exists)
-                connection_record = conn[id]
-                conn_tuple = connection_record[0]
+                conn_tuple = conn_record['id.orig_h'], conn_record['id.resp_h'], conn_record['id.resp_p'],conn_record['service']
+                print conn_tuple
                 # Label 4-tuple
-                conn_label = 'Normal'
-                if self.labels is not None and (conn_tuple[0] in self.labels or conn_tuple[1] in self.labels):
-                    conn_label = 'Malicous'
+                label = 'Normal'
+                if self.labels is not None and (conn_tuple['id.orig_h'] in self.labels or conn_tuple['id.resp_h'] in self.labels):
+                    label = 'Malicous'
                 # Get certs for SSL session (If they exist)
                 cert_key = ssl_record['cert_chain_fuids'].split(',')[0]
                 certs = None
+                print label
+                print cert_key
+                return
                 if cert_key !=  '-':
                     certs = x509[cert_key]
                 # Create the SSL Aggregation
@@ -112,81 +116,4 @@ class MNTC:
                 features[conn_tuple][5] += connection_record[1]['resp_bytes']
                 features[conn_tuple][8] += connection_record[1]['orig_pkts']
                 features[conn_tuple][9] += connection_record[1]['resp_pkts']
-
-        for id,record in conn.items():
-            conn_tuple = record[0]
-            record = record[1]
-            if conn_tuple in data:
-                found = False
-                for agg in data[conn_tuple][1]:
-                    if record in agg:
-                        found = True
-                if record not in data[conn_tuple][0] and ~found:
-                    data[conn_tuple][0].append(record)
-                    # For each connection record, add the corresponding byte values
-                    features[conn_tuple][4] += record['orig_bytes']
-                    features[conn_tuple][5] += record['resp_bytes']
-                    features[conn_tuple][8] += record['orig_pkts']
-                    features[conn_tuple][9] += record['resp_pkts']
-                del conn[id]
-
-        print 'now here'
-        for id,record in data.items():
-            conn_records = record[0]
-            ssl_aggs = record[1]
-            label = record[2]
-            ssl_conn_records = [agg[0] for agg in ssl_aggs]
-
-            # conn_records.sort(key=lambda r: r['ts'])
-            # ssl_conn_records.sort(key=lambda r: r['ts'])
-
-            combined = conn_records + ssl_conn_records
-            combined.sort(key=lambda r: r['ts'])
-
-            durations = [x['duration'].total_seconds() for x in combined]
-            durations_squared = [pow(x['duration'].total_seconds(), 2) for x in combined]
-
-            # ---------------- Calculate Connection Features --------------------------
-            features[id][0] = len(combined)
-            if len(conn_records) > 0:
-                features[id][1] = mean(durations)
-                features[id][2] = pow( mean(durations_squared) - pow(features[id][2], 2), 0.5)
-
-                lb = features[id][1] - features[id][2]
-                ub = features[id][1] + features[id][2] 
-
-                features[id][3] = len([x for x in conn_records if (x['duration'].total_seconds() < lb or x['duration'].total_seconds() > ub)]) / float(len(durations))
-                features[id][6] = features[id][5] / (features[id][5] + features[id][4])
-
-                e_states = ['SF', 'S1', 'S2', 'S3', 'RSTO', 'RSTR']
-                # non_e_states = ['OTH', 'SO', 'REJ', 'SH', 'SHR', 'RSTOS0', 'RSTRH']
-                e = len([x for x in combined if (x['conn_state'] in e_states)])
-                n = len(combined) - e
-
-                features[id][7] = e / (e+n)
-
-                ts = [x['ts'] for x in combined]
-                interval_1 = []
-                periodicity = []
-                for i in range(len(ts)-1):
-                    t1 = ts[i]
-                    t2 = ts[i+1]
-                    interval_1.append((t2 - t1).total_seconds())
-                for i in range(len(interval_1)-1):
-                    p1 = interval_1[i]
-                    p2 = interval_1[i+1]
-                    periodicity.append(abs(p2-p1))
-                features[id][10] = mean(periodicity)
-
-                periodicity_squared = [pow(x,2) for x in periodicity]
-                features[id][11] = pow( mean(periodicity_squared) - pow(features[id][10], 2), 0.5)
-
-            # ------------------ Calculate SSL Features ----------------------------
-            features[id][13] = len(conn_records) / len(ssl_aggs)
-            del data[id]
-        print features
-
-
-
-def mean(L):
-    return 0 if len(L) == 0 else sum(L) / len(L)
+        

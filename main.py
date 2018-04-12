@@ -1,7 +1,6 @@
 # from forest import Forest
 import sys
-# from MNTC import MNTC
-from test import TEST
+from MNTC import MalNetTraffClass
 # from forest import Forest
 from utils import *
 
@@ -22,13 +21,13 @@ def main():
             return
 
     training = readData('labels.csv',
-                                debug = True,
+                                debug = False,
                                 label_index = 0,
                                 variable_index = (0,0),
                                 separator=',',load_all=True)
                                 
-    # mntc = MNTC(['Data'], training.y)
-    test = TEST(['Data'], training.y)
+    # mntc = MNTC(['TestData'], training.y)
+    test = MalNetTraffClass(['TestData'], training.y, pickle=True)
     test.preProcess()
 
     
