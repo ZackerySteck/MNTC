@@ -41,7 +41,7 @@ class MalNetTraffClass:
         return pd.read_csv(log,delimiter='\t',
                 header=6,skiprows=skiprows,
                 index_col=None,usecols=cols,
-                low_memory=False)
+                low_memory=False).head(-1)
 
     def preProcess(self, log_dir = None):
         print bcolors.WARNING+"Loading log files. This can take a some time depending on file size."+bcolors.ENDC
@@ -55,16 +55,16 @@ class MalNetTraffClass:
             current = None
             start = time.time()
             if 'conn.log' in log:
-                conn = self.parseLog(log, [0,1,2,4,5,7,8,9,10,16,18], [7])
+                conn = self.parseLog(log, [0,1,2,4,5,7,8,9,10,16,18], [7, -1])
                 conn.columns = ['ts', 'uid', 'id.orig_h','id.resp_h','id.resp_p','service',
                                 'duration','orig_bytes','resp_bytes','orig_pkts','resp_pkts']
                 current = conn
             elif 'ssl.log' in log:
-                ssl = self.parseLog(log, [0,1,2,4,5,6,14], [7])
+                ssl = self.parseLog(log, [0,1,2,4,5,6,14], [7, -1])
                 ssl.columns = ['ts', 'uid', 'id.orig_h','id.resp_h','id.resp_p','version','cert_chain_fuids']
                 current = ssl
             else:
-                x509 = self.parseLog(log, range(20), [7])
+                x509 = self.parseLog(log, range(20), [7, -1])
                 x509.columns = ['ts','id','certificate.version',
                                'certificate.serial','certificate.subject',
                                'certificate.issuer','certificate.not_valid_before',
@@ -89,13 +89,16 @@ class MalNetTraffClass:
         self.constructFeatures(conn,ssl,x509)
     
     def constructFeatures(self,conn,ssl,x509):
-        conn.set_index('uid', inplace=True)
+        # conn.set_index('uid', inplace=True)
         ssl.set_index('uid', inplace=True)
-        x509.set_index('id', inplace=True)
-
+        # x509.set_index('id', inplace=True)
+        
+        aggregate_data = {}
         for id,ssl_record in ssl.iterrows():
+            print id
+            print ssl_record
+            continue
             conn_record = conn.loc[id]
-            print conn_record
             if conn_record is not None:
                 # Get connection record of SSL session (if it exists)
                 conn_tuple = (conn_record['id.orig_h'], conn_record['id.resp_h'], conn_record['id.resp_p'],conn_record['service'])
@@ -106,23 +109,20 @@ class MalNetTraffClass:
                 # Get certs for SSL session (If they exist)
                 cert_key = ssl_record['cert_chain_fuids'].split(',')[0]
                 certs = None
-                print label
-                print cert_key
-                return
                 if cert_key !=  '-':
-                    certs = x509[cert_key]
+                    certs = x509.loc[cert_key]
                 # Create the SSL Aggregation
-                ssl_aggregation = [connection_record[1], ssl_record] if certs is None else [connection_record[1],ssl_record, certs]
+                ssl_agg = [conn_record, ssl_record] if certs is None else [conn_record,ssl_record, certs]
                 
                 # If the connection is already stored, append the SSL Aggregation. Otherwise, create new entry
-                if conn_tuple in data:
-                    data[conn_tuple][1].append(ssl_aggregation)
+                if conn_tuple in aggregate_data:
+                    aggregate_data[conn_tuple][1].append(ssl_agg)
                 else:
-                    features[conn_tuple] = [0.0 for x in xrange(28)]
-                    data[conn_tuple] = [[],[ssl_aggregation], conn_label]
+                    # features[conn_tuple] = [0.0 for x in xrange(28)]
+                    aggregate_data[conn_tuple] = [[],[ssl_agg], label]
             
-                features[conn_tuple][4] += connection_record[1]['orig_bytes']
-                features[conn_tuple][5] += connection_record[1]['resp_bytes']
-                features[conn_tuple][8] += connection_record[1]['orig_pkts']
-                features[conn_tuple][9] += connection_record[1]['resp_pkts']
+                # features[conn_tuple][4] += connection_record[1]['orig_bytes']
+                # features[conn_tuple][5] += connection_record[1]['resp_bytes']
+                # features[conn_tuple][8] += connection_record[1]['orig_pkts']
+                # features[conn_tuple][9] += connection_record[1]['resp_pkts']
         
