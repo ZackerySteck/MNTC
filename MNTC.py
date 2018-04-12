@@ -95,9 +95,6 @@ class MalNetTraffClass:
         
         aggregate_data = {}
         for id,ssl_record in ssl.iterrows():
-            print id
-            print ssl_record
-            continue
             conn_record = conn.loc[id]
             if conn_record is not None:
                 # Get connection record of SSL session (if it exists)
