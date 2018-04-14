@@ -27,9 +27,21 @@ def main():
                                 separator=',',load_all=True)
                                 
     # mntc = MNTC(['TestData'], training.y)
-    test = MalNetTraffClass(['TestData'], training.y, pickle=True)
-    test.preProcess()
+    # test = MalNetTraffClass(['TestData'], training.y, pickle=True)
+    test = MalNetTraffClass(labels=training.y, pickle=True)
 
+    # training_paths = test.constructPaths('ISCX/Training', [])
+    test_paths = test.constructPaths('ISCX/Test', [])
+    # (tconn, tssl, tx509) = test.preProcess(training_paths)
+    (teconn, tessl,tex509) = test.preProcess(test_paths)
+
+    # training_features = test.constructFeatures(tconn, tssl, tx509, log_dir = training_paths)
+    # print training_features
+    test_features = test.constructFeatures(teconn, tessl, tex509, log_dir = test_paths)
+
+    # test.preProcess()
+    # agg = test.constructFeatures()
+    # print agg
     
 if __name__ == "__main__":
     main()
