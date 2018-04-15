@@ -1,5 +1,7 @@
 # Malware Network Traffic Classifier
-A random forest trained to detect malicious network traffic from BRO Log files. Built using Python v2.7, SciPy, NumPy, and Pandas. Trained, validated, and tested using the CTU-Botnet datasets (see below).
+A random forest trained to detect malicious network traffic from BRO Log files. Built using Python v2.7, NumPy, and Pandas. Trained, validated, and tested using the CTU-Botnet datasets (see below).
+
+Recommended Minimum of 8 GB RAM.
 
 ## CTU Datasets TO-USE:
 ### Training

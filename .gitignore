@@ -1,3 +1,4 @@
 TestData/*
 ISCX/*
 pickle/*.pkl
+./*.pyc
