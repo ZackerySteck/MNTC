@@ -5,12 +5,12 @@ import datetime, time, os, math
 import multiprocessing as mp
 
 class MalNetTraffClass:
-    def __init__(self,labels = None, debug = False, pickle = False, processcount=10):
+    def __init__(self,labels = None, debug = False, pickle = False, maxprocesses=10):
         # self.log_dir = log_dir
         self.debug = debug
         self.labels = labels
         self.pickle = pickle
-        self.processcount = processcount
+        self.processcount = maxprocesses
         self.aggregate_data = {}
         # if log_dir is not None:
         #     self.constructPaths(log_dir)
@@ -66,13 +66,11 @@ class MalNetTraffClass:
             if 'conn.log' in log:
                 conn = self.parseLog(log, [0,1,2,4,5,7,8,9,10,16,18], [7, -1],['ts', 'uid', 'id.orig_h','id.resp_h','id.resp_p','service',
                                 'duration','orig_bytes','resp_bytes','orig_pkts','resp_pkts'])      
-                # Pandas type inference incorrect for columns the Bro uses '-' as 'NaN' - convert to correct dtype  
                 conn.fillna({'ts':0, 'id.resp_p':0,'duration':0,'orig_bytes':0,'resp_bytes':0,'orig_pkts':0,'resp_pkts':0}, inplace=True)
                 current = conn
             elif 'ssl.log' in log:
                 ssl = self.parseLog(log, [0,1,2,4,5,6,9,14], [7, -1], ['ts', 'uid', 'id.orig_h','id.resp_h','id.resp_p','version','server_name','cert_chain_fuids'])
-                # ssl.update(ssl[['uid','id.orig_h','id.resp_h','version','cert_chain_fuids']].fillna('-',inplace=True))
-                ssl.fillna({'ts':0, 'id.resp_p':0,'cert_chain_fuids':'-','server_name':'-'}, inplace=True)
+                ssl.fillna({'ts':0, 'id.resp_p':0,'cert_chain_fuids':'-','server_name':'-', 'version':'-'}, inplace=True)
                 current = ssl
             else:
                 x509 = self.parseLog(log, range(20), [7, -1],['ts','id','certificate.version',
@@ -110,22 +108,21 @@ class MalNetTraffClass:
         print bcolors.WARNING+'Calculating feature set. This can take some time depending on file size.'+bcolors.ENDC
         self.aggregate_data = {}
         if os.path.isfile('./pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int2.pkl'):
-            print 'Intermediate file found for interval 2. Loading...'
-            aggregate_data = self.loadPickle('./pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int2.pkl')
+            print 'Intermediate file found for interval 2 (post-dangle check). Loading...'
+            self.aggregate_data = self.loadPickle('./pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int2.pkl')
             del conn
             del ssl
             del x509
-            return self.finalizeFeatures(aggregate_data)
-        if conn is None or ssl is None or x509 is None:
-            return
+            return self.finalizeFeatures()
         if os.path.isfile('./pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int1.pkl'):
-            print 'Intermediate file found for interval 1. Loading...'
-            aggregate_data = self.loadPickle('./pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int1.pkl')
-            aggregate_data = self.intermediate2(conn, ssl,log_dir)
+            print 'Intermediate file found for interval 1 (pre-dangle check. Loading...'
+            self.aggregate_data = self.loadPickle('./pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int1.pkl')
+            self.intermediate2(conn, ssl,log_dir)
             del conn
             del ssl
             del x509
-            return self.finalizeFeatures(aggregate_data)
+            return self.finalizeFeatures()
+        print 'outer'
         self.intermediate1(conn,ssl,x509, log_dir)
         self.intermediate2(conn,ssl,log_dir)
         return self.finalizeFeatures()
@@ -186,8 +183,9 @@ class MalNetTraffClass:
             self.savePickle(self.aggregate_data, './pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int1.pkl')
 
     def intermediate2(self, conn, ssl, log_dir):
-        print 'Checking for dangling connection records...'        
+        print 'Checking for dangling connection records. This is the most time complex calculation... (%d records)' % (conn.shape[0])        
         stime = time.time() 
+
         # Break the connection records into batches and distribute among worker processes
         total = conn.shape[0]
         batch_size = (total+self.processcount-1) / self.processcount
@@ -210,15 +208,41 @@ class MalNetTraffClass:
         for j in jobs:
             j.join()
 
-        print('All processes returned in %0.4f seconds' % (time.time() - stime))
-        print len(resultdict)
+        print(bcolors.OKBLUE+'All processes returned in %0.4f seconds' % (time.time() - stime))
+        print 'Process results: '
         print resultdict
-        return
+        print bcolors.ENDC
+
+        # Aggregate processes return values
+        nempty = [item for key,item in resultdict.items() if len(item) > 0]
+        combined = {}
+        for item in nempty:
+            for conn_tuple, data in item:
+                if conn_tuple not in combined:
+                    combined[conn_tuple] = data
+                else:
+                    for id, record in data['records']:
+                        combined[conn_tuple]['records'][id] = record
+                        combined[conn_tuple][4] += data[4]
+                        combined[conn_tuple][5] += data[5]
+                        combined[conn_tuple][8] += data[8]
+                        combined[conn_tuple][9] += data[9]
+
+        # Add return values to big dictionary
+        for conn_tuple, item in combined:
+            for id, record in item['records']:
+                self.aggregate_data[conn_tuple][0][id] = record
+            self.aggregate_data[conn_tuple][2][4] = item[4]
+            self.aggregate_data[conn_tuple][2][5] = item[5]
+            self.aggregate_data[conn_tuple][2][8] = item[8]
+            self.aggregate_data[conn_tuple][2][9] = item[9]
 
         if self.pickle:
             print 'Saving intermediate feature set... (int 2)'
             self.savePickle(self.aggregate_data, './pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int2.pkl')
 
+    # Target of multiprocessing; Iterates through range of connection records to look for
+    # records with non-unique conn_tuple that havent been added to the dictionary
     def dangleCheck(self,conn, start, end, tid, out_q):
         stime = time.time()
         ids = list(conn.index)
@@ -227,22 +251,23 @@ class MalNetTraffClass:
             record = conn.loc[id]
             conn_tuple = (record['id.orig_h'], record['id.resp_h'], record['id.resp_p'],record['service'])
             if conn_tuple in self.aggregate_data and id not in self.aggregate_data[conn_tuple][1]:
-                print '%d adding to conn_tuple' %(tid)
+                print '%d found dangling record id: %d. Adding to conn_tuple.' % (tid, id)
                 if conn_tuple not in records:
-                    records[conn_tuple] = {'records':{}, '4':0,'5':0,'8':0,'9':0}
+                    records[conn_tuple] = {'records':{}, 4:0,5:0,8:0,9:0}
                 records[conn_tuple]['records'][id] = record
-                records[conn_tuple]['4'] += record['orig_bytes']
-                records[conn_tuple]['5'] += record['resp_bytes']
-                records[conn_tuple]['8'] += record['orig_pkts']
-                records[conn_tuple]['9'] += record['resp_pkts']
+                records[conn_tuple][4] += record['orig_bytes']
+                records[conn_tuple][5] += record['resp_bytes']
+                records[conn_tuple][8] += record['orig_pkts']
+                records[conn_tuple][9] += record['resp_pkts']
+
         elapsed = time.time() - stime
         print('Process %d completed in %0.4f seconds' % (tid, elapsed))
-        print records
         ret = {tid:records}
         out_q.put(ret)
 
-    def finalizeFeatures(self, aggregate_data):
-        for id,record in aggregate_data.items():
+    # Finalizes the featureset (calculates remaining features)
+    def finalizeFeatures(self):
+        for id,record in self.aggregate_data.items():
             conn_agg = record[0]
             ssl_aggs = record[1]
             label = record[3]
@@ -253,28 +278,32 @@ class MalNetTraffClass:
             combined = conn_records + ssl_conn_records
             combined.sort(key=lambda r: r['ts'])
 
-            durations = [x['duration'] for x in combined]
-            durations_squared = [pow(x['duration'], 2) for x in combined]
-
             # ---------------- Calculate Connection Features --------------------------
             self.aggregate_data[id][2][0] = len(combined)
             if len(conn_records) > 0:
+                # Feature 2 - Mean of durations
+                durations = [x['duration'] for x in combined]
                 self.aggregate_data[id][2][1] = mean(durations)
+
+                # Feature 3 - Standard deviation of durations
+                durations_squared = [pow(x['duration'], 2) for x in combined]
                 self.aggregate_data[id][2][2] = pow( mean(durations_squared) - pow(self.aggregate_data[id][2][2], 2), 0.5)
 
+                # Feature 4 - Standard deviation range of duration
                 lb = self.aggregate_data[id][2][1] - self.aggregate_data[id][2][2]
                 ub = self.aggregate_data[id][2][1] + self.aggregate_data[id][2][2] 
-
                 self.aggregate_data[id][2][3] = len([x for x in conn_records if (x['duration'] < lb or x['duration'] > ub)]) / float(len(durations))
-                self.aggregate_data[id][2][6] = self.aggregate_data[id][2][5] / (self.aggregate_data[id][2][5] + aggregate_data[id][2][4])
+                
+                # Feature 7 - Ratio of responder bytes to all bytes
+                self.aggregate_data[id][2][6] = self.aggregate_data[id][2][5] / (self.aggregate_data[id][2][5] + self.aggregate_data[id][2][4])
 
+                # Feature 8 - Ratio of established connections
                 e_states = ['SF', 'S1', 'S2', 'S3', 'RSTO', 'RSTR']
-                # non_e_states = ['OTH', 'SO', 'REJ', 'SH', 'SHR', 'RSTOS0', 'RSTRH']
                 e = len([x for x in combined if (x['conn_state'] in e_states)])
                 n = len(combined) - e
+                self.aggregate_data[id][2][7] = e / (e+n)
 
-                aggregate_data[id][2][7] = e / (e+n)
-
+                # Feature 11 - Periodicity Mean
                 ts = [x['ts'] for x in combined]
                 interval_1 = []
                 periodicity = []
@@ -286,20 +315,37 @@ class MalNetTraffClass:
                     p1 = interval_1[i]
                     p2 = interval_1[i+1]
                     periodicity.append(abs(p2-p1))
-                aggregate_data[id][2][10] = mean(periodicity)
+                self.aggregate_data[id][2][10] = mean(periodicity)
 
+                # Feature 12 - Standard Deviation of periodicity
                 periodicity_squared = [pow(x,2) for x in periodicity]
-                aggregate_data[id][2][11] = pow( mean(periodicity_squared) - pow(aggregate_data[id][2][10], 2), 0.5)
+                self.aggregate_data[id][2][11] = pow( mean(periodicity_squared) - pow(self.aggregate_data[id][2][10], 2), 0.5)
 
             # ------------------ Calculate SSL Features ----------------------------
-            aggregate_data[id][2][13] = len(conn_records) / len(ssl_aggs)
+            # Feature 13 - Ratio of connection records and ssl aggregations
+            self.aggregate_data[id][2][12] = len(conn_records) / len(ssl_aggs)
 
-            num_tls = len([x[1] for x in [item for key,item in ssl_aggs.items()] if 'TLS' in x[1]['version']])
-            aggregate_data[id][2][14] = num_tls / (num_tls+len(ssl_aggs))
-            num_no_sni = len([x[1] for x in [item for key,item in ssl_aggs.items()] if '-' in x[1]['server_name']])
-        # self.features = aggregate_data
-        # print len(aggregate_data)
-        return aggregate_data
+            # Feature 14 - Ration of TLS
+            num_tls = len([x['version'] for x in [item[1] for key,item in ssl_aggs.items()] if 'TLS' in x['version']])
+            self.aggregate_data[id][2][13] = num_tls / (num_tls+len(ssl_aggs))
+            
+            # Feature 15 - Ratio of SNI
+            num_no_sni = len([x['server_name'] for x in [item[1] for key,item in ssl_aggs.items()] if '-' in x['server_name']])
+            self.aggregate_data[id][2][14] = (len(ssl_aggs)-num_no_sni) / len(ssl_aggs)
+
+            # Skipping feature 16
+
+
+
+        features = []
+        for key, item in self.aggregate_data.items():
+            record = []
+            record.append(key)
+            for i in item[2]:
+                record.append(i)
+            record.append(item[3])
+            features.append(record)
+        return features
 
 def mean(L):
     return 0 if len(L) == 0 else sum(L) / len(L)

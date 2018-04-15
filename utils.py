@@ -4,14 +4,16 @@ import random
 import math
 from datetime import datetime
 
-class training:
+class Training:
     def __init__(self, data, x_index=(0,1), y_index=0, size=0):
         self.data = data
+        print x_index
+        print data[:,x_index[0]:x_index[1]]
         self.x = np.array(data[:,x_index[0]:x_index[1]])
         self.y = np.array(data[:,y_index])
         self.size = size
 
-class test:
+class Test:
     def __init__(self, data, x_index=(0,1), y_index=0, size=0):
         self.data = data
         self.x = np.array(data[:,x_index[0]:x_index[1]])
@@ -24,7 +26,7 @@ def readData(filename, debug, label_index, variable_index, separator = ',', load
     df = pd.read_csv(filename, header=None, sep=separator)
     data = df.as_matrix()
     if load_all :
-        return training(data,
+        return Training(data,
                             x_index = variable_index,
                             y_index = label_index,
                             size = len(data))
@@ -42,18 +44,18 @@ def readData(filename, debug, label_index, variable_index, separator = ',', load
 
     if debug:
         ix = [i for i in range(training_size)]
-        training_set = training(np.array(data[0:training_size,:]),
+        training_set = Training(np.array(data[0:training_size,:]),
                             x_index = variable_index,
                             y_index = label_index,
                             size = training_size)
     else:
         ix = random.sample(range(len(data)), training_size)
-        training_set = training(np.array(random.sample(data, training_size)),
+        training_set = Training(np.array(random.sample(data, training_size)),
                             x_index = variable_index,
                             y_index = label_index,
                             size = training_size)
 
-    test_set = test(np.delete(data, ix, axis=0),
+    test_set = Test(np.delete(data, ix, axis=0),
                     x_index = variable_index,
                     y_index = label_index,
                     size = test_size)
