@@ -1,4 +1,3 @@
-# from forest import Forest
 import sys
 from MNTC import MalNetTraffClass
 from forest import Forest
@@ -26,23 +25,21 @@ def main():
                                 variable_index = (0,0),
                                 separator=',',load_all=True)
 
-    test = MalNetTraffClass(labels=labels.y, pickle=True)
+    mntc = MalNetTraffClass(labels=labels.y, pickle=True)
 
-    training_paths = test.constructPaths('ISCX/Training', [])
-    # test_paths = test.constructPaths('ISCX/Test', [])
-    (tconn, tssl, tx509) = test.preProcess(training_paths)
+    training_paths = mntc.constructPaths('TestData/Training/set1', [])
+    test_paths = mntc.constructPaths('ISCX/Test', [])
+
+    (tconn, tssl, tx509) = mntc.preProcess(training_paths)
     # (teconn, tessl,tex509) = test.preProcess(test_paths)
 
-    training_features = test.constructFeatures(tconn, tssl, tx509, log_dir = training_paths)
-    # print training_features
+    training_features = mntc.constructFeatures(tconn, tssl, tx509, log_dir = training_paths)
     # test_features = test.constructFeatures(teconn, tessl, tex509, log_dir = test_paths)
 
 
-    training = Training(training_features, x_index=(1,29),y_index=30)
+    training = Training(training_features, x_index=(1,29),y_index=29)
+    print training.y
     # test = Test(test_features, x_index=(1,29), y_index=30)
-    # test.preProcess()
-    # agg = test.constructFeatures()
-    # print agg
     
 if __name__ == "__main__":
     main()

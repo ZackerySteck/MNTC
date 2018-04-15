@@ -6,19 +6,11 @@ import multiprocessing as mp
 
 class MalNetTraffClass:
     def __init__(self,labels = None, debug = False, pickle = False, maxprocesses=10):
-        # self.log_dir = log_dir
         self.debug = debug
         self.labels = labels
         self.pickle = pickle
         self.processcount = maxprocesses
-        self.aggregate_data = {}
-        # if log_dir is not None:
-        #     self.constructPaths(log_dir)
-        #     if self.pickle:
-        #         if os.path.isfile('./pickle/'+log_dir.replace('/','%')+str(hash(log_dir))+'cmpl.pkl'):
-        #             print 'Pickle of final feature set found. Loading...'
-        #             self.features = self.loadPickle('./pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'cmpl.pkl')
-                    
+        self.aggregate_data = {}                  
 
     # Recursively construct directory strings from root until files are found
     def constructPaths(self, log_dir = None, arr = []):
@@ -94,7 +86,7 @@ class MalNetTraffClass:
                     elapsed = time.time() - start
                     print('File pickled in %0.4f seconds' % (elapsed))
                 print '-'*40
-            print (bcolors.OKBLUE + 'Log preprocessing completed in %0.4f seconds.' % (time.time() - sstart))
+            print (bcolors.OKBLUE + 'Log pre-processing completed in %0.4f seconds.' % (time.time() - sstart))
             print bcolors.ENDC
         return (conn, ssl, x509)
 
@@ -122,7 +114,6 @@ class MalNetTraffClass:
             del ssl
             del x509
             return self.finalizeFeatures()
-        print 'outer'
         self.intermediate1(conn,ssl,x509, log_dir)
         self.intermediate2(conn,ssl,log_dir)
         return self.finalizeFeatures()
@@ -179,11 +170,11 @@ class MalNetTraffClass:
         print('Used connection records dropped in %0.4f seconds' % (time.time()-start))
         
         if self.pickle:
-            print 'Saving intermediate feature set... (int 1)'
+            print bcolors.OKBLUE+'Saving intermediate feature set... (int 1, pre-dangle check)\n'+bcolors.ENDC
             self.savePickle(self.aggregate_data, './pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int1.pkl')
 
     def intermediate2(self, conn, ssl, log_dir):
-        print 'Checking for dangling connection records. This is the most time complex calculation... (%d records)' % (conn.shape[0])        
+        print 'Checking for dangling connection records. This will take some time... (%d records)' % (conn.shape[0])        
         stime = time.time() 
 
         # Break the connection records into batches and distribute among worker processes
@@ -238,7 +229,7 @@ class MalNetTraffClass:
             self.aggregate_data[conn_tuple][2][9] = item[9]
 
         if self.pickle:
-            print 'Saving intermediate feature set... (int 2)'
+            print bcolors.OKBLUE+'Saving intermediate feature set... (int 2, post-dangle check)\n'+bcolors.ENDC
             self.savePickle(self.aggregate_data, './pickle/'+log_dir[0].replace('/','%')+str(hash(log_dir[0]))+'int2.pkl')
 
     # Target of multiprocessing; Iterates through range of connection records to look for

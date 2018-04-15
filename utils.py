@@ -6,11 +6,9 @@ from datetime import datetime
 
 class Training:
     def __init__(self, data, x_index=(0,1), y_index=0, size=0):
-        self.data = data
-        print x_index
-        print data[:,x_index[0]:x_index[1]]
-        self.x = np.array(data[:,x_index[0]:x_index[1]])
-        self.y = np.array(data[:,y_index])
+        self.data = np.array(data)
+        self.x = np.array(self.data[:,x_index[0]:x_index[1]])
+        self.y = np.array(self.data[:,y_index])
         self.size = size
 
 class Test:
